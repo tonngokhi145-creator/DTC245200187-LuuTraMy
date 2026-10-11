@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+
+*.log
+*.zip
+*.sql
+*.sql.gz
+
+backup/
+.vscode/
+.DS_Store
