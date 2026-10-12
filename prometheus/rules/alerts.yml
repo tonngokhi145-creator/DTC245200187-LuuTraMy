@@ -1,0 +1,86 @@
+groups:
+  - name: wordpress-mysql-alerts
+    rules:
+
+      # 1. WordPress CPU > 80% trong 2 phut
+      - alert: WordPressHighCPU
+        expr: |
+          max by (container_name) (
+            docker_container_cpu_usage_percent{
+              job="docker-telegraf",
+              container_name=~"recipe-lab-wordpress.*"
+            }
+          ) > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WordPress CPU cao"
+          description: "CPU WordPress vuot 80% trong 2 phut"
+
+      # 2. WordPress Memory > 85% trong 2 phut
+      - alert: WordPressHighMemory
+        expr: |
+          max by (container_name) (
+            docker_container_mem_usage_percent{
+              job="docker-telegraf",
+              container_name=~"recipe-lab-wordpress.*"
+            }
+          ) > 85
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "WordPress Memory cao"
+          description: "RAM WordPress vuot 85% trong 2 phut"
+
+      # 3. MySQL Connections > 80 trong 1 phut
+      - alert: MySQLTooManyConnections
+        expr: |
+          mysql_global_status_threads_connected{
+            job="mysql"
+          } > 80
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MySQL co qua nhieu ket noi"
+          description: "So ket noi MySQL vuot 80"
+
+      # 4. MySQL Connection Error Rate > 5/s
+      - alert: MySQLErrorRateHigh
+        expr: |
+          sum(
+            rate(
+              mysql_global_status_connection_errors_total{
+                job="mysql"
+              }[5m]
+            )
+          ) > 5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MySQL co nhieu loi ket noi"
+          description: "Toc do loi ket noi MySQL vuot 5/s"
+
+      # 5. Disk free < 15% trong 5 phut
+      - alert: HighDiskUsage
+        expr: |
+          (
+            node_filesystem_avail_bytes{
+              job="node-exporter",
+              fstype!~"tmpfs|overlay|squashfs|ramfs"
+            }
+            /
+            node_filesystem_size_bytes{
+              job="node-exporter",
+              fstype!~"tmpfs|overlay|squashfs|ramfs"
+            }
+          ) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Dung luong dia sap day"
+          description: "Dung luong trong duoi 15%"

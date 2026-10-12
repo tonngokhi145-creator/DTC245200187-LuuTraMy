@@ -215,3 +215,99 @@ File duoc luu trong repository de phuc vu
 minh chung va tai su dung Dashboard.
 Viec tu dong provisioning can cau hinh them
 theo dinh dang JSON Grafana tuong thich.
+
+---
+
+## Commit 3 - Centralized Logging and Alerting
+
+### 1. Logging Stack
+
+He thong su dung:
+
+- Loki: Luu tru va truy van logs.
+- Promtail: Thu thap Docker container logs.
+- Grafana: Hien thi logs va metrics.
+- Alertmanager: Tiep nhan va quan ly canh bao.
+
+Cau hinh:
+
+- compose.logging.yaml
+- loki/loki.yml
+- promtail/promtail.yml
+- alertmanager/alertmanager.yml
+- grafana/provisioning/datasources/loki.yml
+
+### 2. Khoi dong Logging
+
+```bash
+docker compose -f compose.yaml \
+  -f compose.monitoring.yaml \
+  -f compose.logging.yaml up -d
+```
+
+### 3. Truy van Logs
+
+Mo Grafana tai:
+
+http://localhost:13000
+
+Chon Explore, Data source Loki.
+
+WordPress logs:
+
+```logql
+{service="wordpress"}
+```
+
+Nginx logs:
+
+```logql
+{service="nginx"}
+```
+
+### 4. Dashboard Logs & Metrics
+
+Dashboard: Recipe Viet - Logs & Metrics
+
+Bao gom 3 panel:
+
+- Nginx Requests - Last 5 Minutes
+- Docker CPU Usage - Recipe Viet
+- WordPress Application Logs
+
+File Dashboard JSON:
+
+grafana/dashboards/recipe-viet-logs-metrics.json
+
+### 5. Prometheus Alert Rules
+
+File:
+
+prometheus/rules/alerts.yml
+
+Gom 5 canh bao:
+
+1. WordPressHighCPU
+2. WordPressHighMemory
+3. MySQLTooManyConnections
+4. MySQLErrorRateHigh
+5. HighDiskUsage
+
+### 6. Kiem thu Alertmanager
+
+Da kiem thu thanh cong:
+
+- Prometheus tai duoc 5 Alert Rules.
+- Rule Health hien thi OK.
+- Prometheus nhan dien Alertmanager.
+- RecipeVietTestAlert chuyen sang FIRING.
+- Alertmanager nhan duoc canh bao.
+- Da xoa rule thu nghiem sau khi test.
+
+Luu y: Viec gui email can canh hinh receiver rieng.
+
+### 7. Dia chi truy cap
+
+- Prometheus: http://localhost:19090
+- Grafana: http://localhost:13000
+- Alertmanager: http://localhost:19093

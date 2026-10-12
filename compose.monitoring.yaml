@@ -1,7 +1,6 @@
-
 services:
   # ==========================================
-  # 1. Prometheus - Thu thap metrics
+  # 1. Prometheus - Metrics & Alerting
   # ==========================================
   prometheus:
     image: prom/prometheus:v3.5.0
@@ -10,6 +9,7 @@ services:
       - "127.0.0.1:19090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -18,7 +18,7 @@ services:
       - monitoring
 
   # ==========================================
-  # 2. Grafana - Hien thi Dashboard
+  # 2. Grafana - Dashboard
   # ==========================================
   grafana:
     image: grafana/grafana:latest
@@ -46,19 +46,18 @@ services:
     command:
       - --path.rootfs=/host
     volumes:
-      - /:/host:ro
+      - /:/host:ro,rslave
     pid: host
     networks:
       - monitoring
 
   # ==========================================
-  # 4. cAdvisor - Docker Container Monitoring
+  # 4. cAdvisor - Container Monitoring
   # ==========================================
   cadvisor:
     image: ghcr.io/google/cadvisor:0.60.6
     restart: unless-stopped
-    command:
-      - --disable_metrics=disk
+    privileged: true
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
@@ -68,7 +67,7 @@ services:
       - monitoring
 
   # ==========================================
-  # 5. MySQL Exporter - Giam sat Database
+  # 5. MySQL Exporter
   # ==========================================
   mysql-exporter:
     image: prom/mysqld-exporter:v0.20.0
@@ -86,7 +85,7 @@ services:
       - monitoring
 
   # ==========================================
-  # 6. Nginx Exporter - Giam sat Web Server
+  # 6. Nginx Exporter
   # ==========================================
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:1.5.1
@@ -99,44 +98,27 @@ services:
       - monitoring
 
   # ==========================================
-  # 7. Docker Socket Proxy
-  # Gioi han truy cap Docker API
+  # 7. Docker API Proxy - Docker Socket
   # ==========================================
   docker-api-proxy:
-    image: lscr.io/linuxserver/socket-proxy:latest
+    image: tecnativa/docker-socket-proxy:latest
     restart: unless-stopped
     environment:
       CONTAINERS: "1"
       INFO: "1"
-      EVENTS: "1"
+      NETWORKS: "1"
       POST: "0"
-      ALLOW_START: "0"
-      ALLOW_STOP: "0"
-      ALLOW_RESTARTS: "0"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    read_only: true
-    tmpfs:
-      - /run
-      - /tmp
     networks:
       - docker-api
 
   # ==========================================
-  # 8. Telegraf - Giam sat Docker Container
-  # Thong qua Docker API
+  # 8. Telegraf - Docker Container Metrics
   # ==========================================
   telegraf:
     image: telegraf:1.40.1-alpine
     restart: unless-stopped
-    user: "1000:1000"
-    read_only: true
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    tmpfs:
-      - /tmp
     volumes:
       - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
     depends_on:
@@ -146,7 +128,7 @@ services:
       - monitoring
 
 # ==========================================
-# Docker Volumes
+# Persistent Volumes
 # ==========================================
 volumes:
   prometheus_data:
@@ -154,7 +136,7 @@ volumes:
 
 # ==========================================
 # Docker Networks
-# app-network va monitoring da khai bao
+# app-network va monitoring duoc khai bao
 # trong compose.yaml
 # ==========================================
 networks:

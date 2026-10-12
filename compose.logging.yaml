@@ -1,0 +1,59 @@
+services:
+  # ==========================================
+  # 1. Loki - Luu tru va truy van log tap trung
+  # ==========================================
+  loki:
+    image: grafana/loki:2.9.10
+    user: "0:0"
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:13100:3100"
+    volumes:
+      - ./loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki_data:/loki
+    command:
+      - -config.file=/etc/loki/loki.yml
+    networks:
+      - monitoring
+
+  # ==========================================
+  # 2. Promtail - Thu thap Docker Container Logs
+  # ==========================================
+  promtail:
+    image: grafana/promtail:2.9.10
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./promtail/promtail.yml:/etc/promtail/config.yml:ro
+      - promtail_positions:/tmp
+    command:
+      - -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - monitoring
+
+  # ==========================================
+  # 3. Alertmanager - Quan ly va gui canh bao
+  # ==========================================
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:19093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/config.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - --config.file=/etc/alertmanager/config.yml
+      - --storage.path=/alertmanager
+    networks:
+      - monitoring
+
+# ==========================================
+# Volumes - Luu tru du lieu
+# ==========================================
+volumes:
+  loki_data:
+  promtail_positions:
+  alertmanager_data:
