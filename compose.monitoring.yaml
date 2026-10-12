@@ -1,0 +1,162 @@
+
+services:
+  # ==========================================
+  # 1. Prometheus - Thu thap metrics
+  # ==========================================
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:19090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    networks:
+      - monitoring
+
+  # ==========================================
+  # 2. Grafana - Hien thi Dashboard
+  # ==========================================
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:13000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/datasources/prometheus.yml:/etc/grafana/provisioning/datasources/prometheus.yml:ro
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring
+
+  # ==========================================
+  # 3. Node Exporter - CPU, RAM, Disk
+  # ==========================================
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    restart: unless-stopped
+    command:
+      - --path.rootfs=/host
+    volumes:
+      - /:/host:ro
+    pid: host
+    networks:
+      - monitoring
+
+  # ==========================================
+  # 4. cAdvisor - Docker Container Monitoring
+  # ==========================================
+  cadvisor:
+    image: ghcr.io/google/cadvisor:0.60.6
+    restart: unless-stopped
+    command:
+      - --disable_metrics=disk
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    networks:
+      - monitoring
+
+  # ==========================================
+  # 5. MySQL Exporter - Giam sat Database
+  # ==========================================
+  mysql-exporter:
+    image: prom/mysqld-exporter:v0.20.0
+    restart: unless-stopped
+    command:
+      - --mysqld.address=mysql:3306
+      - --mysqld.username=recipe_exporter
+    environment:
+      MYSQLD_EXPORTER_PASSWORD: ${MYSQL_EXPORTER_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - app-network
+      - monitoring
+
+  # ==========================================
+  # 6. Nginx Exporter - Giam sat Web Server
+  # ==========================================
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:1.5.1
+    restart: unless-stopped
+    command:
+      - --nginx.scrape-uri=http://nginx:8081/stub_status
+    depends_on:
+      - nginx
+    networks:
+      - monitoring
+
+  # ==========================================
+  # 7. Docker Socket Proxy
+  # Gioi han truy cap Docker API
+  # ==========================================
+  docker-api-proxy:
+    image: lscr.io/linuxserver/socket-proxy:latest
+    restart: unless-stopped
+    environment:
+      CONTAINERS: "1"
+      INFO: "1"
+      EVENTS: "1"
+      POST: "0"
+      ALLOW_START: "0"
+      ALLOW_STOP: "0"
+      ALLOW_RESTARTS: "0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    read_only: true
+    tmpfs:
+      - /run
+      - /tmp
+    networks:
+      - docker-api
+
+  # ==========================================
+  # 8. Telegraf - Giam sat Docker Container
+  # Thong qua Docker API
+  # ==========================================
+  telegraf:
+    image: telegraf:1.40.1-alpine
+    restart: unless-stopped
+    user: "1000:1000"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    depends_on:
+      - docker-api-proxy
+    networks:
+      - docker-api
+      - monitoring
+
+# ==========================================
+# Docker Volumes
+# ==========================================
+volumes:
+  prometheus_data:
+  grafana_data:
+
+# ==========================================
+# Docker Networks
+# app-network va monitoring da khai bao
+# trong compose.yaml
+# ==========================================
+networks:
+  docker-api:
+    internal: true
